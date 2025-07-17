@@ -1,8 +1,11 @@
 //Importaciones 
-const validate = require("../helpers/validate-user");
-const User = require("../models/user");
+const path = require("path");
+const fs = require("fs");
 const bcrypt = require("bcryptjs");
+const validate = require("../helpers/validate-user");
 const jwt = require("../helpers/jwt");
+const User = require("../models/user");
+
 
 //acciones
 
@@ -81,20 +84,6 @@ const register = (req,res) => {
     })
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const login = (req,res) => {
     
     // Recoger los datos de la peticion
@@ -250,24 +239,74 @@ const update = async(req,res) => {
 }
 
 
-const upload = (req,res) => {
+const upload = async(req,res) => {
     
-    return res.status(200).json({
-        status : 200,
-        message : "accion para uploads usuario "
-        }
-    )
+    try{
+        
+        const id = req.user.id;
 
+        const {originalname, filename , path : filePath} = req.file;
+
+        const ext = path.extname(originalname).toLowerCase();
+        const validExtensions = [".png", ".jpg", ".jpeg", ".gif"];
+
+        if(!validExtensions.includes(ext)){
+            // eliminar el archivo subido
+            fs.unlinkSync(filePath);
+            return res.status(400).json({
+                status : "ERROR",   
+                message : "La extension de la imagen no es valida"
+            });
+        }
+
+        const userUpdated = await User.findByIdAndUpdate(id , {avatar : filename} , {new : true});
+
+        if(!userUpdated){
+            return res.status(400).json({
+                status : "ERROR",
+                message : "Error al actualizar el usuario"
+            });
+        }
+
+        return res.status(200).json({
+            status : 200,
+            message : "Imagen subida correctamente",
+            file : {
+                originalname,
+                filename,
+                path : filePath,
+                ext
+            }
+        })
+
+    }catch(error){
+        console.log(error);
+        return res.status(500).json({
+            status : "ERROR",
+            message : "Error al subir la imagen"
+        })
+    }
 
 }
 
 const avatar = (req,res) => {
 
-    return res.status(200).json({
-        status : 200,
-        message : "accion para avatar usuario "
+    let file = req.params.file;
+    let filePath = "./uploads/avatars/" + file;
+
+    fs.stat(filePath, (error, exist) => {
+
+        if(!error && exist){
+            return res.sendFile(path.resolve(filePath));
+        }else{
+            return res.status(404).json({
+                status : "ERROR",
+                message : "El avatar no existe"
+            }); 
         }
-    )
+
+    })
+
 }
 
 const soloParaUsuariosIdentificados = (req,res) => {
